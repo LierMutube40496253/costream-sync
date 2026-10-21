@@ -8,3 +8,4 @@ pytest
 httpx
 imageio-ffmpeg
 playwright
+discord.py

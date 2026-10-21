@@ -25,6 +25,7 @@ button { font: inherit; padding: 7px 12px; border-radius: 8px; border: 1px solid
          color: var(--fg); cursor: pointer; }
 button:disabled { opacity: .45; cursor: default; }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+button.discord-btn { background: #5865f2; border-color: #5865f2; width: 100%; font-weight: 600; }
 button.link { background: none; border: none; color: var(--muted); padding: 0 4px; text-decoration: underline; }
 .small-btn { padding: 4px 10px; font-size: 13px; }
 .row-between { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 8px; }

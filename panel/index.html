@@ -14,7 +14,14 @@
     <button id="logout" class="link" hidden>Switch</button>
   </header>
 
-  <!-- Until the Discord login exists: name + room (stands in for the voice channel). -->
+  <!-- Discord mode: log in; your room is the voice channel you're in. -->
+  <div id="discord" class="card" hidden>
+    <h2>Log in</h2>
+    <p class="muted small">Use the Discord account you're in the voice channel with. We only see your Discord id and name.</p>
+    <button id="discord-login" class="primary discord-btn">Log in with Discord</button>
+  </div>
+
+  <!-- Dev mode (server without Discord): name + room. -->
   <form id="join" class="card" hidden>
     <h2>Join a room</h2>
     <label>Your name <input id="j-user" required maxlength="40" autocomplete="nickname"></label>
@@ -24,6 +31,10 @@
   </form>
 
   <section id="main" hidden>
+    <div id="novoice" class="card" hidden>
+      <strong>Join a voice channel in Discord</strong>
+      <p class="muted small">Your group is everyone in the same voice channel, on a Discord server where the costream bot is. It shows up here as soon as you join.</p>
+    </div>
     <div id="offer" class="card offer" hidden>
       <div class="offer-title" id="offer-title"></div>
       <div class="offer-move" id="offer-move"></div>

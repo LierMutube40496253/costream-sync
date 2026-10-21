@@ -3,7 +3,7 @@
   "name": "costream-sync",
   "version": "0.1.0",
   "description": "Measures which moment of a YouTube live stream you are watching and shifts playback to match an accepted sync target.",
-  "permissions": ["storage"],
+  "permissions": ["storage", "identity"],
   "host_permissions": [
     "https://www.youtube.com/*",
     "http://localhost/*",
@@ -12,7 +12,7 @@
     "ws://127.0.0.1/*"
   ],
   "background": { "service_worker": "background.js" },
-  "action": { "default_title": "costream-sync: idle" },
+  "action": { "default_title": "costream-sync", "default_popup": "popup.html" },
   "content_scripts": [
     {
       "matches": ["https://www.youtube.com/*"],

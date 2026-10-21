@@ -15,6 +15,9 @@ STACK = ExitStack()
 @pytest.fixture
 def client(monkeypatch):
     rooms.clear()
+    srv.users.clear()
+    monkeypatch.setattr(srv, "voice", srv.VoiceDirectory())
+    monkeypatch.setattr(srv, "AUTH_MODE", "dev")
     monkeypatch.setattr(srv, "OFFER_TIMEOUT", 0.5)
     with TestClient(app) as c:
         yield c
@@ -51,7 +54,7 @@ class U:
         self.name = name
         self.ext = STACK.enter_context(client.websocket_connect("/ws"))
         self.ext.send_json({"type": "hello", "role": "extension", "user": name, "room": room})
-        assert self.ext.receive_json()["type"] == "hello_ok"
+        drain_until(self.ext, "hello_ok")
         self.ext.send_json(status(edge, edge if current is None else current, mx, k))
         self.panel = STACK.enter_context(client.websocket_connect("/ws"))
         self.panel.send_json({"type": "hello", "role": "panel", "user": name, "room": room})

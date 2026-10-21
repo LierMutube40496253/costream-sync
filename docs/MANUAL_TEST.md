@@ -1,5 +1,9 @@
 # Manual test on real YouTube with two PCs
 
+This guide uses **dev mode** (no Discord), the quickest way to test. With Discord set up
+([DISCORD_SETUP.md](DISCORD_SETUP.md)), steps 4 and 5 become "click the extension icon → Log in
+with Discord" and "open the panel → Log in with Discord", and the room is your voice channel.
+
 Goal: two people (A and B) on two PCs, in normal Chrome, watch the same YouTube live stream.
 A asks to match, B accepts, and both see the same moment. PC 1 also runs the sync server.
 Takes about 15 minutes to set up.

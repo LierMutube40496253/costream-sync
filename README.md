@@ -105,18 +105,23 @@ npm install
 ```
 
 - **Server and panel:** `.\.venv\Scripts\python.exe -m server`, then open `http://localhost:8765/panel/`.
-  Settings come from `.env`; copy `.env.example`, which needs no secrets yet.
-- **Extension:** `chrome://extensions` → Developer mode → Load unpacked → the `extension`
-  folder. Until the Discord login exists, connect it from its service-worker console:
-  `costream.join({server: 'ws://localhost:8765', room: 'test', user: 'A', maxDelay: 30})`.
+  Settings come from `.env` (copy `.env.example`; real values never go in git).
+- **Discord mode:** create a Discord application and bot, put its id, bot token and a shared key
+  in `.env`, and run `.\.venv\Scripts\python.exe -m server.bot` next to the server. Step by step
+  in [docs/DISCORD_SETUP.md](docs/DISCORD_SETUP.md). Then:
+  - the panel and the extension's toolbar popup each have **Log in with Discord**
+  - your group is whoever is in your voice channel
+- **Dev mode (no Discord):** the panel asks for a name and a room, and the extension joins from
+  its service-worker console: `costream.join({server: 'ws://localhost:8765', room: 'test', user: 'A'})`.
+- **Extension:** `chrome://extensions` → Developer mode → Load unpacked → the `extension` folder.
 - **Two PCs on real YouTube:** step by step in [docs/MANUAL_TEST.md](docs/MANUAL_TEST.md).
 
 ## Tests
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q                # everything Python, about 4 min
-.\.venv\Scripts\python.exe -m pytest -q -m "not e2e"   # quick: server rules and protocol (21)
-npx vitest run                                         # extension logic (34)
+.\.venv\Scripts\python.exe -m pytest -q                # everything Python, about 7 min
+.\.venv\Scripts\python.exe -m pytest -q -m "not e2e"   # quick: rules, protocol, Discord login, bot (32)
+npx vitest run                                         # extension logic (39)
 npm run sim:all                                        # 5 simulator scenarios, about 10 min
 .\.venv\Scripts\python.exe demo\e2e\two_window_e2e.py --headed   # watch the end-to-end test
 .\.venv\Scripts\python.exe demo\e2e\record_demo.py     # re-record docs/demo.gif
@@ -126,6 +131,16 @@ npm run sim:all                                        # 5 simulator scenarios, 
 - the two-window end-to-end test above
 - the panel test: A clicks Match in A's panel, B's panel shows "Accepting will skip your stream
   forward 16.0 s", B accepts, and both panels show the result
+- the Discord login, against a fake Discord (`tests/e2e/fake_discord.py`):
+  - the panel's "Log in with Discord"
+  - the real extension logging in through Chrome's login window
+  - panel and extension paired as one user
+
+The Discord tests also check the security rules:
+- an invalid token is rejected
+- the user id comes from Discord, never from what the client claims
+- the bot's key is checked
+- requests are rate-limited
 
 ## Limitations
 
@@ -138,14 +153,15 @@ npm run sim:all                                        # 5 simulator scenarios, 
   showed "Something went wrong" about 30 s into playback, even with no extension loaded. That's
   why the tests use the fake page, and real YouTube is tested by hand (docs/MANUAL_TEST.md).
 - **Across continents, precision is set by the network**, as described under Measured results.
-- **Not built yet:** the Discord login and bot (groups = voice channel members), and CI. Twitch
-  is out of scope, because its player can't rewind live.
+- **Discord login and bot:** built and tested against a fake Discord, but not yet with a real
+  Discord application.
+- **Not built yet:** CI. Twitch is out of scope, because its player can't rewind live.
 
 ## Project layout
 
 | Path | What |
 |---|---|
-| `server/` | sync rules (`sync_logic.py`) and the WebSocket server + panel hosting (`app.py`) |
+| `server/` | sync rules (`sync_logic.py`), WebSocket server + panel hosting (`app.py`), Discord login check (`auth.py`), voice channels (`voice.py`), Discord bot (`bot.py`) |
 | `extension/` | Chrome MV3 extension; `sync_math.js`, `controller.js` and `client_core.js` also run in Node for the simulator and tests |
 | `panel/` | the panel page, served at `/panel/` |
 | `demo/sim/` | far-apart simulator with live graph (`node demo/sim/run.js <scenario>`, graph at `http://localhost:8790`) |

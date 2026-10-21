@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import M from '../../extension/sync_math.js';
 import C from '../../extension/controller.js';
 import S from '../../extension/client_core.js';
+import D from '../../extension/discord_auth.js';
 
 const { decide, checkTarget, clockSample, bestClock, StampTracker, validSetTarget, PARAMS } = M;
 
@@ -123,6 +124,28 @@ describe('HeadTracker and live edge', () => {
   it('live edge is never later than where the viewer is now', () => {
     expect(M.liveEdge(20, -3)).toBe(20);
     expect(M.liveEdge(41, 15.5)).toBe(25.5);
+  });
+});
+
+describe('Discord login helpers', () => {
+  it('asks only for identify, with a state', () => {
+    const u = new URL(D.authorizeUrl('https://discord.com/oauth2/authorize', '123', 'https://abc.chromiumapp.org/', 'x7'));
+    expect(u.searchParams.get('scope')).toBe('identify');
+    expect(u.searchParams.get('response_type')).toBe('token');
+    expect(u.searchParams.get('state')).toBe('x7');
+    expect(u.searchParams.get('redirect_uri')).toBe('https://abc.chromiumapp.org/');
+  });
+  it('reads the token and expiry from Discord\'s answer', () => {
+    const r = D.parseRedirect('https://abc.chromiumapp.org/#token_type=Bearer&access_token=XYZ&expires_in=600&scope=identify&state=x7', 'x7', 1000);
+    expect(r).toEqual({ token: 'XYZ', expiresAt: 601000 });
+  });
+  it('refuses a login it did not start, and passes on errors', () => {
+    expect(D.parseRedirect('https://a/#access_token=XYZ&state=other', 'x7').error).toMatch(/state did not match/);
+    expect(D.parseRedirect('https://a/#error=access_denied&error_description=The+user+denied', 'x7').error).toBe('The user denied');
+  });
+  it('makes a fresh random state each time', () => {
+    expect(D.newState()).toMatch(/^[0-9a-f]{32}$/);
+    expect(D.newState()).not.toBe(D.newState());
   });
 });
 
@@ -308,6 +331,18 @@ describe('SyncClient', () => {
     c.onMessage({ type: 'match_result', session_id: 's1', group: ['B', 'C'], users: { A: 'declined' } });
     c.onMessage(st);
     expect(targets).toEqual([]);
+  });
+
+  it('says hello with the Discord token, and takes its user id from the server', () => {
+    const sent = [], auth = [];
+    const c = new S.SyncClient({ send: (o) => sent.push(o), token: 'tok', maxDelay: 30, onTarget() {}, onLeave() {},
+                                 onAuthError: (m) => auth.push(m) });
+    c.hello();
+    expect(sent[0]).toEqual({ type: 'hello', role: 'extension', token: 'tok' });   // no user id claimed
+    c.onMessage({ type: 'hello_ok', user: '1001', name: 'Lier' });
+    expect(c.user).toBe('1001');
+    c.onMessage({ type: 'error', code: 'auth', message: 'expired' });
+    expect(auth).toEqual(['expired']);
   });
 
   it('keeps the accepted target for a reloaded page, and forgets it on leave', () => {

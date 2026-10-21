@@ -8,9 +8,13 @@
   class SyncClient {
     // send(obj): deliver to the server. onTarget(msg): a checked set_target.
     // onLeave(sessionId, reason): stop controlling the player.
-    constructor({ send, user, room, maxDelay, onTarget, onLeave, onClock = () => {}, log = () => {},
+    // token: Discord access token (discord mode); user + room: names (dev mode).
+    // onHello({user, name, room_name}), onAuthError(message), onNoVoice(): login / room news.
+    constructor({ send, user, room, token = null, maxDelay, onTarget, onLeave, onClock = () => {}, log = () => {},
+                  onHello = () => {}, onAuthError = () => {}, onNoVoice = () => {},
                   nowSec = () => Date.now() / 1000 }) {
-      Object.assign(this, { send, user, room, maxDelay, onTarget, onLeave, onClock, log, nowSec });
+      Object.assign(this, { send, user, room, token, maxDelay, onTarget, onLeave, onClock, log, nowSec,
+                            onHello, onAuthError, onNoVoice });
       this.samples = [];
       this.clock = null;              // {offset, rtt}: server time = local time + offset
       this.accepted = new Set();      // sessions this user is in by their own accept/request
@@ -19,7 +23,11 @@
       this.last = null;               // last valid measurement, reused while in an ad
     }
 
-    hello() { this.send({ type: 'hello', role: 'extension', user: this.user, room: this.room }); }
+    // With a token the server asks Discord who this is; the id comes from Discord, not from us.
+    hello() {
+      this.send(this.token ? { type: 'hello', role: 'extension', token: this.token }
+                           : { type: 'hello', role: 'extension', user: this.user, room: this.room });
+    }
 
     pingBatch(n = 8, spacingMs = 100) {
       for (let i = 0; i < n; i++) setTimeout(() => this.send({ type: 'clock_ping', t0: this.nowSec() }), i * spacingMs);
@@ -53,8 +61,16 @@
         case 'leave_sync':
           if (msg.session_id === this.session) { this.session = null; this.target = null; this.onLeave(msg.session_id, 'left'); }
           break;
+        case 'hello_ok':
+          if (msg.user) this.user = msg.user;   // in discord mode: the Discord id, from the server
+          this.onHello(msg);
+          break;
+        case 'no_voice_channel':
+          this.onNoVoice();
+          break;
         case 'error':
           this.log('server: ' + msg.message);
+          if (msg.code === 'auth') this.onAuthError(msg.message);
           break;
       }
     }

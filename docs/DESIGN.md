@@ -120,7 +120,11 @@ All parts talk to the sync server over WebSocket (wss) with JSON messages. The e
 
 | Message | From → to | Content | When |
 | --- | --- | --- | --- |
-| `hello` | extension, panel → server | Discord token, role (extension or panel) | On connect |
+| `welcome` | server → any | login mode (`discord` or `dev`), Discord client id and login address | First message on every connection |
+| `hello` | extension, panel → server | Discord access token (scope `identify`), role. The server asks Discord whose token it is (`/users/@me`) and uses that user id, never one the client claims | On connect |
+| `hello` (bot) | Discord bot → server | role `bot`, shared key (`BOT_SHARED_SECRET`) | On connect |
+| `whoami` | extension popup → server | token; answer: Discord id and name, nothing registered | After logging in |
+| `no_voice_channel` | server → panel, extension | the user is in no voice channel the bot can see | On connect or when they leave |
 | `clock_ping` / `clock_pong` | extension ↔ server | client send time / server receive and send times | Every few seconds |
 | `status` | extension → server | video id, current delay, live edge, max delay, player clock time, in\_ad, dvr\_available, measurement quality | About every 250 ms |
 | `group` | server → panel | voice channel members with their delay and state | On any change |
@@ -134,6 +138,15 @@ All parts talk to the sync server over WebSocket (wss) with JSON messages. The e
 | `voice_members` | Discord bot → server | voice channel id, member ids | On join or leave |
 
 The extension re-checks every `set_target` against its own max and the user's acceptance before acting (see Safety).
+
+**Login.** The panel and the extension each log in with Discord (OAuth2 token grant, scope
+`identify`). The panel uses a "Log in with Discord" button. The extension uses its toolbar popup,
+which only shows "Log in with Discord", the logged-in name, the server connection status and
+"Log out". No Discord client secret exists anywhere, and the only secrets (bot token, bot key)
+live in the server's `.env`. Panel and extension are paired because the server resolves both
+tokens to the same Discord user id. Leaving the voice channel ends that user's sync. A server
+without `DISCORD_CLIENT_ID` runs in **dev mode** (name + room instead of Discord), which the
+tests use. Setup: [DISCORD_SETUP.md](DISCORD_SETUP.md).
 
 ## Safety, privacy and invisibility
 
@@ -254,8 +267,8 @@ The measurement method and the request-based sync server are proven. The extensi
 - [x] Sync server with request, accept, decline and timeout; doc protocol, offers worded from the current position, shared reference stamp (21 tests)
 - [x] Extension core: measuring on the server clock, pause/skip plus speed fine-tuning, ad detection, local safety checks (33 tests)
 - [x] Frame-level precision: frame callbacks, player-clock targets, offset reported in ms
-- [ ] Panel web page (works in a browser window and as an OBS dock)
-- [ ] Discord login and bot: groups = voice channel members
+- [x] Panel web page (works in a browser window and as an OBS dock)
+- [x] Discord login and bot: groups = voice channel members (tested against a fake Discord; not yet with a real Discord application)
 - [x] Ad auto-rejoin, rejoin after a page reload, continuous sync
 - [x] Far-apart simulator (5 scenarios) and end-to-end test on a fake YouTube page (two headless Chromium windows, within one frame after sync, ad, reload, error + refresh)
 - [ ] GitHub Actions
