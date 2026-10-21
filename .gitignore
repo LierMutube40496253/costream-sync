@@ -1,0 +1,20 @@
+# Environments and dependencies
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Generated test video (demo/e2e/make_test_video.py makes it on first run)
+demo/e2e/test_video.webm
+
+# Run outputs, logs and screenshots (they can contain stream URLs with your IP address)
+demo/e2e/out/
+demo/sim/out/
+tools/logs/
+demo/*.log
+demo/*.png
+demo/*.csv
+demo/demo_summary.txt
+demo/ext_log_*.txt
+*.log

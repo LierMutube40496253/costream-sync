@@ -1,0 +1,21 @@
+{
+  "name": "Reloads keep the sync: YouTube error + refresh on B, page reload on A, rebuffer on A",
+  "duration": 150,
+  "users": [
+    { "name": "A", "net": { "outMs": 20, "backMs": 20, "jitterMs": 5 }, "stream": { "liveEdge": 15 }, "maxDelay": 30 },
+    { "name": "B", "net": { "outMs": 40, "backMs": 40, "jitterMs": 10 }, "clock": { "errorS": 1.5 },
+      "stream": { "liveEdge": 20, "sittingAt": 30 }, "maxDelay": 30, "answerAfterS": 2 }
+  ],
+  "events": [
+    { "at": 8, "user": "A", "do": "match", "arg": "B" },
+    { "at": 40, "user": "B", "do": "youtubeError", "arg": 4 },
+    { "at": 85, "user": "A", "do": "reload", "arg": 5 },
+    { "at": 120, "user": "A", "do": "rebuffer", "arg": 2 }
+  ],
+  "checks": [
+    { "name": "synced after accept", "users": ["A", "B"], "from": 30, "to": 40, "maxOffsetMs": 33 },
+    { "name": "back in sync after B's error + refresh + preroll (no new offer)", "users": ["A", "B"], "from": 70, "to": 85, "maxOffsetMs": 33 },
+    { "name": "back in sync after A reloads the page", "users": ["A", "B"], "from": 110, "to": 120, "maxOffsetMs": 33 },
+    { "name": "back in sync after A rebuffers 2 s", "users": ["A", "B"], "from": 140, "to": 150, "maxOffsetMs": 33 }
+  ]
+}

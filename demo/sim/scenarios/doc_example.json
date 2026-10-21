@@ -1,0 +1,18 @@
+{
+  "name": "Design doc worked example: A 3/30, B 8/10, C 6/20, D 15/20, A clicks Sync all",
+  "duration": 60,
+  "users": [
+    { "name": "A", "net": { "outMs": 20, "backMs": 20, "jitterMs": 5 }, "stream": { "liveEdge": 3 }, "maxDelay": 30 },
+    { "name": "B", "net": { "outMs": 150, "backMs": 150, "jitterMs": 20 }, "clock": { "errorS": 1.2 },
+      "stream": { "liveEdge": 8 }, "maxDelay": 10, "answerAfterS": 2 },
+    { "name": "C", "net": { "outMs": 40, "backMs": 40, "jitterMs": 10 }, "clock": { "errorS": -0.7 },
+      "stream": { "liveEdge": 6 }, "maxDelay": 20, "answerAfterS": 4 },
+    { "name": "D", "net": { "outMs": 30, "backMs": 30, "jitterMs": 5 }, "stream": { "liveEdge": 15 }, "maxDelay": 20 }
+  ],
+  "events": [
+    { "at": 6, "user": "A", "do": "syncAll" }
+  ],
+  "checks": [
+    { "name": "A, B, C within one frame at 8 s (D left out by the 10 s gap)", "users": ["A", "B", "C"], "from": 35, "to": 60, "maxOffsetMs": 33 }
+  ]
+}

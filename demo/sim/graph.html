@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sync Simulator</title>
+<style>
+  :root { --bg: #fff; --fg: #1d1d1f; --muted: #6e6e73; --grid: #e5e5ea; --band: rgba(52,199,89,.15); }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111; --fg: #f2f2f7; --muted: #98989d; --grid: #2c2c2e; --band: rgba(48,209,88,.18); } }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .muted { color: var(--muted); }
+  canvas { width: 100%; height: 260px; display: block; margin: 8px 0 20px; }
+  #legend span { margin-right: 14px; white-space: nowrap; }
+  #checks div { font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<h1 id="title">Simulator</h1>
+<div class="muted">Ground truth from the fake players. Top: how far behind the real game each user sees (s). Bottom: offset of each user from the first user (ms); green band = one frame (±33 ms).</div>
+<div id="legend"></div>
+<canvas id="delay"></canvas>
+<canvas id="offset"></canvas>
+<div id="checks"></div>
+<script>
+const COLORS = ['#0a84ff', '#ff9f0a', '#30d158', '#bf5af2', '#ff375f', '#64d2ff', '#ffd60a', '#ac8e68', '#5e5ce6', '#ff6482'];
+let users = [], rows = [];
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+function draw(canvas, series, opts) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const g = canvas.getContext('2d'); g.scale(dpr, dpr);
+  const pad = { l: 56, r: 8, t: 8, b: 22 };
+  const pts = series.flatMap((s) => s.points);
+  if (!pts.length) return;
+  const t0 = rows[0].t, t1 = Math.max(rows[rows.length - 1].t, t0 + 10);
+  let lo = opts.lo ?? Math.min(...pts.map((p) => p[1])), hi = opts.hi ?? Math.max(...pts.map((p) => p[1]));
+  if (hi - lo < 1e-6) { hi += 1; lo -= 1; }
+  const x = (t) => pad.l + (t - t0) / (t1 - t0) * (w - pad.l - pad.r);
+  const y = (v) => pad.t + (1 - (Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * (h - pad.t - pad.b);
+  g.strokeStyle = css('--grid'); g.fillStyle = css('--muted'); g.font = '11px system-ui'; g.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const v = lo + (hi - lo) * i / 4;
+    g.beginPath(); g.moveTo(pad.l, y(v)); g.lineTo(w - pad.r, y(v)); g.stroke();
+    g.fillText(opts.fmt(v), 4, y(v) + 4);
+  }
+  for (let t = Math.ceil(t0 / 10) * 10; t <= t1; t += 10) g.fillText(t + ' s', x(t) - 8, h - 6);
+  if (opts.band) { g.fillStyle = css('--band'); g.fillRect(pad.l, y(opts.band), w - pad.l - pad.r, y(-opts.band) - y(opts.band)); }
+  series.forEach((s) => {
+    g.strokeStyle = s.color; g.lineWidth = 1.8; g.beginPath();
+    let pen = false;
+    for (const [t, v] of s.points) {
+      if (v == null) { pen = false; continue; }
+      pen ? g.lineTo(x(t), y(v)) : g.moveTo(x(t), y(v)); pen = true;
+    }
+    g.stroke();
+  });
+}
+
+function render() {
+  const delay = users.map((u, i) => ({ color: COLORS[i], points: rows.map((r) => [r.t, r.users[u]?.trueDelay ?? null]) }));
+  draw(document.getElementById('delay'), delay, { fmt: (v) => v.toFixed(1) + ' s' });
+  const ref = users[0];
+  const offset = users.slice(1).map((u, i) => ({ color: COLORS[i + 1], points: rows.map((r) => {
+    const a = r.users[ref]?.trueDelay, b = r.users[u]?.trueDelay;
+    return [r.t, a == null || b == null ? null : (b - a) * 1000];
+  }) }));
+  draw(document.getElementById('offset'), offset, { lo: -200, hi: 200, band: 33, fmt: (v) => v.toFixed(0) + ' ms' });
+  const last = rows[rows.length - 1];
+  document.getElementById('legend').innerHTML = users.map((u, i) => {
+    const s = last && last.users[u];
+    return `<span style="color:${COLORS[i]}">● ${u}</span> <span class="muted">${s ? `${s.state}${s.errMs != null ? ` ${s.errMs} ms` : ''}` : ''}</span>`;
+  }).join(' ');
+}
+
+const es = new EventSource('/events');
+es.addEventListener('meta', (e) => { const m = JSON.parse(e.data); users = m.users; document.getElementById('title').textContent = m.name; });
+es.onmessage = (e) => { rows.push(JSON.parse(e.data)); render(); };
+es.addEventListener('done', (e) => {
+  document.getElementById('checks').innerHTML = JSON.parse(e.data).map((r) =>
+    `<div>${r.pass ? '✅' : '❌'} ${r.name}: worst ${r.worstMs} ms (limit ${r.maxOffsetMs} ms)</div>`).join('');
+  es.close();
+});
+window.addEventListener('resize', render);
+</script>
+</body>
+</html>

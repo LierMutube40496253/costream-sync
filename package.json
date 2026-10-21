@@ -1,0 +1,13 @@
+{
+  "name": "costream-sync",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "vitest run",
+    "sim": "node demo/sim/run.js",
+    "sim:all": "node demo/sim/run.js demo/sim/scenarios/nearby.json && node demo/sim/run.js demo/sim/scenarios/doc_example.json && node demo/sim/run.js demo/sim/scenarios/youtube_head.json && node demo/sim/run.js demo/sim/scenarios/copenhagen_sydney.json"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  }
+}

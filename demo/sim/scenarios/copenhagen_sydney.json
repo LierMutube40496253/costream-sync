@@ -1,0 +1,23 @@
+{
+  "name": "Copenhagen + Sydney: lopsided route, slow drifting clock, ad, rebuffer, YouTube pause",
+  "duration": 190,
+  "users": [
+    { "name": "A", "net": { "outMs": 10, "backMs": 10, "jitterMs": 3 },
+      "clock": { "errorS": 0 }, "stream": { "liveEdge": 18 }, "maxDelay": 30 },
+    { "name": "B", "net": { "outMs": 200, "backMs": 100, "jitterMs": 40, "loss": 0.02 },
+      "clock": { "errorS": -2.3, "driftMsPerMin": 50 }, "stream": { "liveEdge": 25, "sittingAt": 41 },
+      "maxDelay": 30, "answer": "accept", "answerAfterS": 3 }
+  ],
+  "events": [
+    { "at": 8, "user": "A", "do": "match", "arg": "B" },
+    { "at": 60, "user": "B", "do": "ad", "arg": 30 },
+    { "at": 125, "user": "A", "do": "rebuffer", "arg": 1.5 },
+    { "at": 150, "user": "A", "do": "youtubePause", "arg": 4 }
+  ],
+  "checks": [
+    { "name": "synced after accept (limit: 1 frame + 50 ms route asymmetry)", "users": ["A", "B"], "from": 40, "to": 60, "maxOffsetMs": 83 },
+    { "name": "back in sync after B's 30 s ad", "users": ["A", "B"], "from": 115, "to": 125, "maxOffsetMs": 83 },
+    { "name": "back in sync after A rebuffers 1.5 s", "users": ["A", "B"], "from": 140, "to": 150, "maxOffsetMs": 83 },
+    { "name": "back in sync after YouTube paused A for 4 s", "users": ["A", "B"], "from": 170, "to": 190, "maxOffsetMs": 83 }
+  ]
+}

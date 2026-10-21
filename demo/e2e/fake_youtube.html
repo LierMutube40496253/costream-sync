@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fake YouTube live (costream end-to-end test)</title>
+<style>
+  body { margin: 0; background: #111; color: #eee; font: 13px/1.4 system-ui, sans-serif; }
+  #movie_player { position: relative; width: 640px; height: 360px; }
+  video { width: 640px; height: 360px; background: #000; display: block; }
+  #ad, .ytp-error { display: none; position: absolute; inset: 0; align-items: center; justify-content: center; font-size: 24px; }
+  #ad { background: #d9a400; color: #000; }
+  .ytp-error { background: rgba(0, 0, 0, .85); color: #fff; }
+  #movie_player.ad-showing #ad, #movie_player.err .ytp-error { display: flex; }
+  #info { padding: 8px; font-family: ui-monospace, monospace; white-space: pre; }
+</style>
+</head>
+<body>
+<div id="movie_player">
+  <video class="html5-main-video" muted playsinline preload="auto" src="/costream-test/test_video.webm"></video>
+  <div id="ad">AD</div>
+  <div class="ytp-error">Something went wrong. Refresh or try again later.</div>
+</div>
+<div id="info"></div>
+<script>
+// Behaves like YouTube's live player as far as the extension can see (docs/DESIGN.md,
+// Testing strategy: end-to-end on a fake live player). Same model as demo/sim/fake_player.js:
+//   player time  = video.currentTime + P          (getCurrentTime, same for every viewer)
+//   wall time    = player time + K                (K shared by all windows via t0)
+//   live head    = now - edge - K                 (can't play past it)
+//   seekableEnd  = newest chunk end, newest = head + lag; only moves on "downloads"
+//   chunk stamp  = K + jitter(chunk)              (getMediaReferenceTime - getCurrentTime)
+// URL: ?v=costreamtest&edge=15&sit=30&lag=5&t0=<ms shared by all windows>&preroll=5
+const q = new URLSearchParams(location.search);
+const EDGE = Number(q.get('edge') ?? 15);
+const SIT = Number(q.get('sit') ?? EDGE);
+const LAG = Number(q.get('lag') ?? 5);
+const PREROLL = Number(q.get('preroll') ?? 5);
+const T0 = Number(q.get('t0') ?? Date.now()) / 1000;
+const SEG = 5, P = 100000, SEED = 1;
+const K = T0 - P - 60;              // at t0, a viewer with live edge 0 is at video time 60 s
+
+const p = document.getElementById('movie_player');
+const v = p.querySelector('video');
+const info = document.getElementById('info');
+const now = () => Date.now() / 1000;
+const head = (t) => t - EDGE - K;   // player time of the reachable live head
+const newest = (t) => head(t) + LAG;
+const pt = () => v.currentTime + P;
+
+function jitter(chunk) {            // same as demo/sim/fake_player.js hashJitter, +-20 ms
+  let x = (chunk * 2654435761 + SEED * 97) >>> 0;
+  x ^= x >>> 15; x = Math.imul(x, 2246822507) >>> 0; x ^= x >>> 13;
+  return ((x % 10000) / 10000 - 0.5) * 2 * 20 / 1000;
+}
+
+let seekableEnd = Math.floor(newest(now()) / SEG) * SEG;
+let downloadDue = null;
+let adUntil = 0;
+let errorShown = false;
+let atHeadStall = false;            // paused because we reached the live head (buffer empty)
+let freezeUntil = 0, freezeRate = 1;
+
+p.getCurrentTime = () => pt();
+p.getMediaReferenceTime = () => { const c = pt(); return K + jitter(Math.floor(c / SEG)) + c; };
+p.getProgressState = () => ({
+  current: pt(), seekableEnd, seekableStart: pt() - 3600, isAtLiveHead: head(now()) - pt() < 1,
+  ingestionTime: p.getMediaReferenceTime(), allowSeeking: true,
+});
+p.getVideoStats = () => ({ segduration: SEG, live: 'dvr' });
+p.getVideoData = () => ({ video_id: 'costreamtest', isLive: true });
+p.seekToLiveHead = () => { v.currentTime = head(now()) - P; };
+
+// Test controls (Playwright calls these; never the extension).
+window.__fake = {
+  ad(seconds) { p.classList.add('ad-showing'); v.pause(); adUntil = now() + seconds; },
+  error() { errorShown = true; p.classList.add('err'); v.pause(); },          // stays until reload
+  freeze(seconds) { freezeRate = v.playbackRate || 1; v.playbackRate = 0; freezeUntil = now() + seconds; },
+  state() {
+    return { pt: pt(), delay: now() - (pt() + K), edge: EDGE, head: head(now()), seekableEnd, paused: v.paused,
+             rate: v.playbackRate, ad: p.classList.contains('ad-showing'), error: errorShown, K, P };
+  },
+};
+
+// First load: sit at SIT seconds behind the game. A reload: YouTube restarts at its live head
+// after a preroll ad (content doesn't move during the ad).
+const reloaded = sessionStorage.getItem('costream_loaded') === '1';
+sessionStorage.setItem('costream_loaded', '1');
+v.addEventListener('loadedmetadata', () => {
+  const t = now();
+  v.currentTime = (reloaded ? head(t) : t - SIT - K) - P;
+  if (reloaded && PREROLL > 0) window.__fake.ad(PREROLL);
+  else v.play();
+}, { once: true });
+
+setInterval(() => {
+  const t = now();
+  if (adUntil && t >= adUntil) { adUntil = 0; p.classList.remove('ad-showing'); if (!errorShown) v.play(); }
+  if (freezeUntil && t >= freezeUntil) { freezeUntil = 0; v.playbackRate = freezeRate; }
+  // Can't play past the live head: stall (YouTube would wait for the next chunk).
+  if (!v.paused && pt() > head(t)) { atHeadStall = true; v.pause(); }
+  else if (atHeadStall && head(t) > pt() + 0.5) { atHeadStall = false; v.play(); }
+  // "Downloads" only while playing: seekableEnd stands still when paused, frozen, in an ad.
+  const playing = !v.paused && !adUntil && !errorShown && !freezeUntil;
+  const boundary = Math.floor(newest(t) / SEG) * SEG;
+  if (playing && boundary > seekableEnd) {
+    if (downloadDue == null) downloadDue = t + 0.3 * Math.random();
+    if (t >= downloadDue) { seekableEnd = boundary; downloadDue = null; }
+  }
+  const s = window.__fake.state();
+  info.textContent = `fake YouTube live | edge ${EDGE} s | delay ${s.delay.toFixed(3)} s | rate ${s.rate}` +
+    `${s.ad ? ' | AD' : ''}${s.error ? ' | ERROR' : ''}${atHeadStall ? ' | at head (stall)' : ''}`;
+}, 50);
+</script>
+</body>
+</html>

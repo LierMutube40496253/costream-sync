@@ -1,0 +1,16 @@
+{
+  "name": "YouTube lets you play 0.5 s from the newest chunk; A and B both sit at YouTube's head (run 8)",
+  "duration": 45,
+  "users": [
+    { "name": "A", "net": { "outMs": 10, "backMs": 10, "jitterMs": 3 },
+      "stream": { "liveEdge": 15, "youtubeHeadLagS": 0.5 }, "maxDelay": 30 },
+    { "name": "B", "net": { "outMs": 10, "backMs": 10, "jitterMs": 3 },
+      "stream": { "liveEdge": 18.4, "youtubeHeadLagS": 0.5 }, "maxDelay": 30, "answerAfterS": 1 }
+  ],
+  "events": [
+    { "at": 8, "user": "A", "do": "match", "arg": "B" }
+  ],
+  "checks": [
+    { "name": "A and B within one frame", "users": ["A", "B"], "from": 30, "to": 45, "maxOffsetMs": 33 }
+  ]
+}

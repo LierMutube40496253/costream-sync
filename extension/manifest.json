@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "costream-sync",
+  "version": "0.1.0",
+  "description": "Measures which moment of a YouTube live stream you are watching and shifts playback to match an accepted sync target.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "http://localhost/*",
+    "ws://localhost/*",
+    "http://127.0.0.1/*",
+    "ws://127.0.0.1/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "costream-sync: idle" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["page.js"],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["sync_math.js", "controller.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

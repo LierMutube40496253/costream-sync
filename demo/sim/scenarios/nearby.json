@@ -1,0 +1,17 @@
+﻿{
+  "name": "Nearby: A at edge 20 s, B edge 25 s sitting at 41 s (design doc rule 3)",
+  "duration": 75,
+  "users": [
+    { "name": "A", "net": { "outMs": 10, "backMs": 10, "jitterMs": 3 },
+      "clock": { "errorS": 0 }, "stream": { "liveEdge": 20 }, "maxDelay": 30 },
+    { "name": "B", "net": { "outMs": 15, "backMs": 15, "jitterMs": 5 },
+      "clock": { "errorS": -2.3 }, "stream": { "liveEdge": 25, "sittingAt": 41 }, "maxDelay": 30,
+      "answer": "accept", "answerAfterS": 2 }
+  ],
+  "events": [
+    { "at": 8, "user": "A", "do": "match", "arg": "B" }
+  ],
+  "checks": [
+    { "name": "A and B within one frame (33 ms)", "users": ["A", "B"], "from": 45, "to": 75, "maxOffsetMs": 33 }
+  ]
+}

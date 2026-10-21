@@ -1,0 +1,10 @@
+streamlink
+requests
+ntplib
+fastapi
+uvicorn[standard]
+websockets
+pytest
+httpx
+imageio-ffmpeg
+playwright
