@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Co-stream Sync</title>
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<main id="app">
+  <header>
+    <div class="brand"><span id="dot" class="dot" title="not connected"></span><strong>Co-stream Sync</strong></div>
+    <div id="who" class="muted"></div>
+    <button id="logout" class="link" hidden>Switch</button>
+  </header>
+
+  <!-- Until the Discord login exists: name + room (stands in for the voice channel). -->
+  <form id="join" class="card" hidden>
+    <h2>Join a room</h2>
+    <label>Your name <input id="j-user" required maxlength="40" autocomplete="nickname"></label>
+    <label>Room <input id="j-room" required maxlength="60" placeholder="e.g. lck-casters"></label>
+    <p class="muted small">Use the same name in the extension. The room stands in for your Discord voice channel until the Discord login exists.</p>
+    <button type="submit" class="primary">Join</button>
+  </form>
+
+  <section id="main" hidden>
+    <div id="offer" class="card offer" hidden>
+      <div class="offer-title" id="offer-title"></div>
+      <div class="offer-move" id="offer-move"></div>
+      <div class="muted small" id="offer-others"></div>
+      <div class="offer-actions">
+        <button id="accept" class="primary">Accept</button>
+        <button id="decline">Decline</button>
+        <span class="countdown" id="countdown"></span>
+      </div>
+    </div>
+
+    <div id="me" class="card"></div>
+
+    <div class="row-between">
+      <h2>Room</h2>
+      <button id="syncall" class="primary small-btn">Sync all</button>
+    </div>
+    <ul id="members" class="members"></ul>
+
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+  </section>
+</main>
+<script src="panel.js"></script>
+</body>
+</html>

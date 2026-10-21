@@ -12,6 +12,8 @@
   .ytp-error { background: rgba(0, 0, 0, .85); color: #fff; }
   #movie_player.ad-showing #ad, #movie_player.err .ytp-error { display: flex; }
   #info { padding: 8px; font-family: ui-monospace, monospace; white-space: pre; }
+  #note { padding: 6px 8px 0; font-size: 22px; font-weight: 650; min-height: 34px; }
+  #note .label { display: inline-block; min-width: 34px; padding: 0 8px; margin-right: 8px; border-radius: 6px; background: #3b5bdb; color: #fff; }
 </style>
 </head>
 <body>
@@ -20,6 +22,7 @@
   <div id="ad">AD</div>
   <div class="ytp-error">Something went wrong. Refresh or try again later.</div>
 </div>
+<div id="note"></div>
 <div id="info"></div>
 <script>
 // Behaves like YouTube's live player as far as the extension can see (docs/DESIGN.md,
@@ -75,6 +78,13 @@ window.__fake = {
   ad(seconds) { p.classList.add('ad-showing'); v.pause(); adUntil = now() + seconds; },
   error() { errorShown = true; p.classList.add('err'); v.pause(); },          // stays until reload
   freeze(seconds) { freezeRate = v.playbackRate || 1; v.playbackRate = 0; freezeUntil = now() + seconds; },
+  // Caption for the demo recording (set by the test harness, not by the extension).
+  note(label, text) {
+    const n = document.getElementById('note');
+    n.innerHTML = '';
+    const l = document.createElement('span'); l.className = 'label'; l.textContent = label;
+    n.append(l, document.createTextNode(text));
+  },
   state() {
     return { pt: pt(), delay: now() - (pt() + K), edge: EDGE, head: head(now()), seekableEnd, paused: v.paused,
              rate: v.playbackRate, ad: p.classList.contains('ad-showing'), error: errorShown, K, P };

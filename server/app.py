@@ -46,7 +46,11 @@ import statistics
 import time
 from dataclasses import dataclass, field
 
+from pathlib import Path
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from .sync_logic import DEFAULT_MAX_GAP, Member, Plan, match_pair, plan_group
 
@@ -57,6 +61,14 @@ GROUP_INTERVAL = 0.25     # at most 4 group updates per second per room
 
 app = FastAPI(title="costream-sync")
 _ids = itertools.count(1)
+
+# The panel page (docs/DESIGN.md, Architecture): http://<server>/panel/
+app.mount("/panel", StaticFiles(directory=Path(__file__).resolve().parent.parent / "panel", html=True), name="panel")
+
+
+@app.get("/")
+async def root() -> RedirectResponse:
+    return RedirectResponse("/panel/")
 
 
 @dataclass

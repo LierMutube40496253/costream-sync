@@ -199,6 +199,25 @@ describe('Controller', () => {
     expect(c.tick(m({ playerTime: 975.005 })).state).toBe('synced');
   });
 
+  it('"synced" label stays through one-frame flicks, drops after 0.5 s out of range', () => {
+    const p = fakePlayer();
+    let now = 0;
+    const c = new C.Controller(p.actions, () => now);
+    c.setMaxDelay(30);
+    c.setTarget(target(-4000), m());
+    expect(c.tick(m({ playerTime: 1000.005 })).state).toBe('synced');
+    now = 100;
+    expect(c.tick(m({ playerTime: 1000.030 })).state).toBe('synced');    // one-frame flick: still synced
+    now = 400;
+    expect(c.tick(m({ playerTime: 1000.030 })).state).toBe('synced');    // 300 ms out of range
+    now = 450;
+    expect(c.tick(m({ playerTime: 1000.004 })).state).toBe('synced');    // back in range: timer resets
+    now = 500;
+    expect(c.tick(m({ playerTime: 1000.030 })).state).toBe('synced');
+    now = 1000;
+    expect(c.tick(m({ playerTime: 1000.030 })).state).toBe('adjusting'); // 500 ms in a row: drops
+  });
+
   it('skips forward but never past the reachable head', () => {
     const p = fakePlayer();
     const c = new C.Controller(p.actions, () => 0);

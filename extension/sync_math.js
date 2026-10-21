@@ -15,6 +15,8 @@
     GAIN: 0.5,           // speed change per second of error: err 0.03 s -> 0.985x
     MAX_DEV: 0.02,       // design doc: 0.98-1.02x, pitch preserved
     SYNCED: 0.020,       // |err| under 20 ms counts as synced (about one frame)
+    SYNCED_HOLD_MS: 500, // ...and stays "synced" unless out of range for 0.5 s in a row
+                         // (screens show whole frames, so readings flick by one frame)
     HEAD_SLACK: 0.5,     // a target up to 0.5 s past our live head is still accepted
     MAX_SLACK: 0.05,
     HEAD_MARGIN_CHUNKS: 1, // reachable head = newest chunk end (seekableEnd) minus one chunk

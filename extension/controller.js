@@ -47,6 +47,7 @@
     release() {
       this.target = null;
       this.pending = null;
+      this.resetLabel();
       if (this.a.rate() !== 1) this.a.setRate(1);
     }
 
@@ -97,6 +98,7 @@
       if (this.nowMs() < this.settleUntil) return { state: 'settling', err };
 
       const d = M.decide(err);
+      if (d.action !== 'rate') this.resetLabel();   // a pause or skip means we were not in sync
       if (d.action === 'pause') {
         if (this.a.rate() !== 1) this.a.setRate(1);
         this.pausing = true;
@@ -120,8 +122,22 @@
         return { state: 'at_live_edge', err };
       }
       if (Math.abs(this.a.rate() - d.rate) > 1e-4) this.a.setRate(d.rate);
-      return { state: Math.abs(err) < P.SYNCED ? 'synced' : 'adjusting', err };
+      return { state: this.syncedLabel(Math.abs(err) < P.SYNCED) ? 'synced' : 'adjusting', err };
     }
+
+    // Hysteresis: once synced, stay "synced" unless out of range for SYNCED_HOLD_MS in a row.
+    // Without it the label flickered whenever a reading flicked by one frame.
+    syncedLabel(inRange) {
+      const now = this.nowMs();
+      if (inRange) { this.isSynced = true; this.outSince = null; }
+      else if (this.isSynced) {
+        if (this.outSince == null) this.outSince = now;
+        if (now - this.outSince >= P.SYNCED_HOLD_MS) { this.isSynced = false; this.outSince = null; }
+      }
+      return this.isSynced;
+    }
+
+    resetLabel() { this.isSynced = false; this.outSince = null; }
   }
 
   if (root) root.CostreamController = Controller;

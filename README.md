@@ -1,158 +1,158 @@
 # costream-sync
 
-Co-streamers watching the same YouTube live broadcast see the same moment, within about one
-video frame. The design and its rules live in [docs/DESIGN.md](docs/DESIGN.md) (source of
-truth). This README covers how to run each part.
+Co-streamers who watch the same YouTube live broadcast each see it with a different delay, so
+they react to different moments. costream-sync lines their players up **to within about one video
+frame**. Streamers keep watching on youtube.com as normal. A Chrome extension shifts the page's
+own player, and a small server coordinates who syncs with whom.
 
-| Part | Status |
-|---|---|
-| `server/`: sync rules, offers, accept/decline/timeout, sessions, clock (doc protocol) | done, 21 tests |
-| `extension/`: Chrome MV3 core: measure, hold target, ads, freezes, reload rejoin, local safety checks | done, 33 tests; no UI except the badge |
-| `demo/sim/`: fake YouTube player + far-apart simulator with live graph | done, 5 scenarios pass |
-| `demo/e2e/`: end-to-end test, two headless Chromium windows on a fake YouTube page | done, passes (within one frame) |
-| `tools/youtube_checks.py`: checks on real YouTube | live smoke checks only (see below) |
-| Panel, Discord login and bot, CI, deployment | not started |
+![Two windows: B starts 15 s behind A; A clicks Match, B accepts, both end on the same frame](docs/demo.gif)
 
-## Setup (Windows, PowerShell)
+*Two Chrome windows with the extension, on the local fake YouTube page used for testing. B starts
+15 s behind A (frame 1309 vs 1759). A clicks Match, B accepts, and A pauses. Both then show the
+same frame, give or take one (1886 vs 1887). The caption shows the offset measured from the
+frame counter.*
+
+**Example.** A sees a kill 3 s after it happens, B 8 s after. A clicks B, B accepts, and A's
+player pauses 5 s, then fine-tunes its speed. Both now see the kill at the same moment, and the
+sync holds through ads, rebuffers and page reloads until someone leaves.
+
+## How it works
+
+```
+ Streamer's PC                                    Server
+┌──────────────────────────────────────────┐     ┌─────────────────────────────┐
+│ youtube.com tab                          │     │ sync server (FastAPI, WS)   │
+│  page.js     reads YouTube's player      │     │  clock: NTP-style pings     │
+│  content.js  measures the frame on       │     │  rules: who syncs, target   │
+│              screen; pause/skip/speed    │◄───►│  offers: accept / decline / │
+│  background  connection, clock, checks   │ WS  │          15 s timeout       │
+├──────────────────────────────────────────┤     │  serves the panel page      │
+│ panel (browser window or OBS dock)       │◄───►│                             │
+│  group, Match / Sync all, offers, offset │     └─────────────────────────────┘
+└──────────────────────────────────────────┘     (later: Discord bot = groups)
+```
+
+- **One clock for everyone.** Every client converts its time to the server's with NTP-style
+  pings, keeping the lowest round trips. One test PC was 2.3 s slow, and this cancels it.
+- **What's on screen, frame-exact.** `requestVideoFrameCallback` tells the extension which frame
+  was shown and when. YouTube's player clock (`getCurrentTime()`) is identical for every viewer
+  of the same frame: measured in two tabs, the same to 0.1 ms. So a sync target is sent as a
+  position on that clock, with one reference stamp per sync.
+- **Live edge.** YouTube's newest-chunk marker only moves when the player downloads, so the
+  extension keeps the live head moving in real time between downloads.
+- **Rules** ([docs/DESIGN.md](docs/DESIGN.md)):
+  - The group syncs at its slowest member's live edge.
+  - Nobody goes beyond their max extra delay (default 30 s).
+  - Nobody is more than 10 s behind the fastest member.
+  - The largest group whose ranges overlap wins.
+  - Offers are worded from where you are now ("Accepting will skip your stream forward 16 s").
+- **Applying it.**
+  - Pause to add delay; this is exact, measured +4.00 s for a 4 s pause.
+  - Skip forward to remove delay.
+  - Then fine-tune at 0.98–1.02× speed (pitch preserved), continuously.
+  - Nothing is ever drawn on the YouTube page, because streamers capture it in OBS.
+- **Safety.** The extension acts only on a sync this user accepted, re-checks the user's max
+  itself, and "Leave sync" restores normal playback at once.
+
+## Measured results
+
+**On real YouTube** (a 24/7 live stream):
+- The frame's capture time from the page player, read over 10 s, varied by only 0.02 s
+  (41.932–41.949 s).
+- Cross-checked against the HLS playlist's `#EXT-X-PROGRAM-DATE-TIME`: the same clock, and the
+  page gets each chunk about 1 s earlier.
+
+**Simulator** (`demo/sim/`): virtual users run the real extension logic against a fake player,
+with their own network and clock, through the real server. Pass or fail comes from ground truth.
+
+| Scenario | Conditions | Worst offset |
+|---|---|---|
+| nearby | B's clock 2.3 s slow; B 16 s behind its live edge | 14 ms |
+| doc_example | 4 users, Sync all; one left out by the 10 s gap rule | 8 ms |
+| youtube_head | users sitting closer to live than the safety margin | 7 ms |
+| reload_and_errors | YouTube error + refresh, page reload, rebuffer | 2–18 ms |
+| copenhagen_sydney | 200 ms out / 100 ms back, ±40 ms jitter, 2% loss, drifting clock, 30 s ad | 72–79 ms |
+
+The last row is limited by the network: a lopsided route (200 ms out, 100 ms back) shifts any
+clock estimate by (200 − 100) / 2 = 50 ms, and no client can detect that.
+
+**End-to-end** (`demo/e2e/`): two headless Chromium windows with the real extension on a local
+fake YouTube page. The offset is measured from the video's frame counter.
+
+| Step | Mean offset | Worst sample |
+|---|---|---|
+| before (B starts 15 s behind) | +14,983 ms | |
+| after A clicks Match and B accepts | 7.7 ms | 25.3 ms |
+| after an 8 s ad on B | 4.7 ms | 25.4 ms |
+| after A reloads the page (rejoins, no new offer) | −1.5 ms | 25.1 ms |
+| after a YouTube error on B + refresh | −3.2 ms | 17.2 ms |
+
+Screens only show whole frames (33 ms at 30 fps), so two players 8 ms apart read as −8 ms or
++25 ms depending on where the frame boundary falls. The test therefore requires a mean within
+16.7 ms (half a frame at 30 fps), and no sample more than two frames apart.
+
+## Run it
+
+You need Python 3.12+ and Node 20+.
 
 ```powershell
+git clone https://github.com/LierMutube40496253/costream-sync.git
 cd costream-sync
-py -3.13 -m venv .venv
+py -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m playwright install chromium
 npm install
 ```
+
+- **Server and panel:** `.\.venv\Scripts\python.exe -m server`, then open `http://localhost:8765/panel/`.
+  Settings come from `.env`; copy `.env.example`, which needs no secrets yet.
+- **Extension:** `chrome://extensions` → Developer mode → Load unpacked → the `extension`
+  folder. Until the Discord login exists, connect it from its service-worker console:
+  `costream.join({server: 'ws://localhost:8765', room: 'test', user: 'A', maxDelay: 30})`.
+- **Two PCs on real YouTube:** step by step in [docs/MANUAL_TEST.md](docs/MANUAL_TEST.md).
 
 ## Tests
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q                 # server (21) + end-to-end (1, about 3 min)
-.\.venv\Scripts\python.exe -m pytest -q -m "not e2e"    # quick: server only
-npx vitest run                                          # extension logic (33)
-npm run sim:all                                         # 5 simulator scenarios (about 9 min)
+.\.venv\Scripts\python.exe -m pytest -q                # everything Python, about 4 min
+.\.venv\Scripts\python.exe -m pytest -q -m "not e2e"   # quick: server rules and protocol (21)
+npx vitest run                                         # extension logic (34)
+npm run sim:all                                        # 5 simulator scenarios, about 10 min
+.\.venv\Scripts\python.exe demo\e2e\two_window_e2e.py --headed   # watch the end-to-end test
+.\.venv\Scripts\python.exe demo\e2e\record_demo.py     # re-record docs/demo.gif
 ```
 
-## End-to-end test (demo/e2e/)
+`pytest` includes the browser tests (marked `e2e`):
+- the two-window end-to-end test above
+- the panel test: A clicks Match in A's panel, B's panel shows "Accepting will skip your stream
+  forward 16.0 s", B accepts, and both panels show the result
 
-```powershell
-.\.venv\Scripts\python.exe demo\e2e\two_window_e2e.py            # headless
-.\.venv\Scripts\python.exe demo\e2e\two_window_e2e.py --headed   # watch the two windows
-```
+## Limitations
 
-This runs two Chromium instances with the real extension (all parts, including `background.js`
-and `content.js`) on `fake_youtube.html`. That page answers as `www.youtube.com` (Playwright
-serves it locally) and behaves like YouTube's live player, as measured:
-- a live head that moves in real time
-- `seekableEnd` that only moves on downloads
-- per-chunk stamps
-- ads, YouTube's error box, freezes
-- a reload restarts at live after a preroll
+- **Relies on undocumented YouTube player functions:** `getCurrentTime`,
+  `getMediaReferenceTime`, `getProgressState`, `getVideoStats` and `getVideoData` on
+  `#movie_player`. YouTube can change or remove them at any time. The extension then stops
+  measuring (the panel shows "waiting for video") instead of syncing wrongly, and the live
+  smoke checks (`tools/youtube_checks.py`) are there to notice it.
+- **Automated browsers on real YouTube are unreliable.** In automated test windows, YouTube
+  showed "Something went wrong" about 30 s into playback, even with no extension loaded. That's
+  why the tests use the fake page, and real YouTube is tested by hand (docs/MANUAL_TEST.md).
+- **Across continents, precision is set by the network**, as described under Measured results.
+- **Not built yet:** the Discord login and bot (groups = voice channel members), and CI. Twitch
+  is out of scope, because its player can't rewind live.
 
-The test video (`make_test_video.py`, generated once) has a frame counter, and the true offset
-between the windows is read from it. The test steps:
-1. A clicks Match on B, B accepts (B starts 15 s behind).
-2. An 8 s ad on B.
-3. A reloads the page.
-4. YouTube error on B, then a refresh.
+## Project layout
 
-Each step must end within one frame, with no new offer.
+| Path | What |
+|---|---|
+| `server/` | sync rules (`sync_logic.py`) and the WebSocket server + panel hosting (`app.py`) |
+| `extension/` | Chrome MV3 extension; `sync_math.js`, `controller.js` and `client_core.js` also run in Node for the simulator and tests |
+| `panel/` | the panel page, served at `/panel/` |
+| `demo/sim/` | far-apart simulator with live graph (`node demo/sim/run.js <scenario>`, graph at `http://localhost:8790`) |
+| `demo/e2e/` | fake YouTube page, end-to-end test, demo recording |
+| `tools/` | `delay_probe.py` (HLS timestamp probe) and `youtube_checks.py` (live smoke checks) |
+| `docs/` | `DESIGN.md` (design, source of truth), `MANUAL_TEST.md`, `demo.gif` |
 
-How "within one frame" is checked: screens show whole frames, so two players that are 8 ms apart
-read as −8 ms or +25 ms on the frame counter, depending on where the frame boundary falls. This
-happens with visible windows too. The check therefore uses the mean over 20 s, which recovers
-the real offset, and it must be within half a frame at 30 fps (16.7 ms). On top of that, no
-single sample may be more than two frames (66.7 ms) apart, so the screens never differ by more
-than one frame.
+## License
 
-Run as part of `pytest` (2026-10-21):
-
-| Step | Mean | Worst sample |
-|---|---|---|
-| Before sync | +14,983 ms | |
-| After accept | 7.7 ms | 25.3 ms |
-| After the ad | 4.7 ms | 25.4 ms |
-| After the reload | −1.5 ms | 25.1 ms |
-| After error + refresh | −3.2 ms | 17.2 ms |
-
-One offer was shown in total. In the five runs since this rule was set, every step passed, with
-means between −5.6 and +8.4 ms.
-
-## Sync server
-
-```powershell
-.\.venv\Scripts\python.exe -m uvicorn server.app:app --port 8765
-```
-
-Everything connects to `ws://localhost:8765/ws` and starts with `hello` (role `extension` or
-`panel`, `user`, `room`). Until the Discord bot exists, `room` stands in for the voice channel.
-The message list is at the top of `server/app.py` and in the design doc.
-
-Example (rule 3): A sits at its live edge of 20 s. B's live edge is 25 s, but B sits at 41 s. A
-clicks Match on B. B's panel gets "Accepting will skip your stream forward 15.5 s". Both
-extensions then get `set_target`: one reference stamp, and the target on the player clock.
-
-## Extension (extension/)
-
-| File | Runs in | Does |
-|---|---|---|
-| `page.js` | YouTube page (MAIN world) | reads the player (`getCurrentTime`, `getMediaReferenceTime`, live head). Read-only |
-| `content.js` | isolated world | YouTube adapter: frame-exact measurement with `requestVideoFrameCallback`; pause, skip and speed |
-| `controller.js` | content + simulator | holds the target: pause / skip forward, then 0.98–1.02x speed |
-| `client_core.js` | background + simulator | protocol, clock sync (lowest-RTT pings), acceptance and max checks |
-| `sync_math.js` | everywhere | pure maths |
-| `background.js` | service worker | one server connection per YouTube tab, badge |
-
-Load it in Chrome: open `chrome://extensions`, turn on Developer mode, click "Load unpacked"
-and choose `extension/`. Until the panel and Discord login exist, joining is done from the
-service worker console: `costream.join({room: 'demo', user: 'A', maxDelay: 30})`.
-
-## Simulator (demo/sim/)
-
-```powershell
-node demo/sim/run.js demo/sim/scenarios/copenhagen_sydney.json   # live graph: http://localhost:8790
-npm run sim:all
-```
-
-Each virtual user runs the real `controller.js` and `client_core.js` against a fake YouTube
-player, through a network shaper (delay per direction, jitter, loss), on its own wrong clock, with
-the real Python server. Pass or fail comes from ground truth: the fake players know exactly what
-each user sees. Results go to `demo/sim/out/`.
-
-Results (2026-10-21):
-
-| Scenario | What happens | Worst offset | Limit |
-|---|---|---|---|
-| `nearby` | A at 20 s, B edge 25 s sitting at 41 s, B's clock 2.3 s slow | 3.6 ms | 33 ms |
-| `doc_example` | A/B/C/D Sync all: A, B, C sync at 8 s, D left out (12 s over the gap) | 5.9–12.4 ms | 33 ms |
-| `youtube_head` | YouTube lets you play 0.5 s from its newest chunk; A and B sit there (real demo run 8: both refused the target before the fix) | 15.8 ms | 33 ms |
-| `copenhagen_sydney` | B: 200 ms out / 100 ms back, ±40 ms jitter, 2% loss, clock 2.3 s slow drifting 50 ms/min; 30 s ad on B; 1.5 s rebuffer on A; YouTube pauses A for 4 s | 71–75 ms | 83 ms |
-
-The fake player's `seekableEnd` behaves like YouTube's: it only moves when a chunk is downloaded,
-never during pauses, freezes or ads. The extension's live-edge estimate (`HeadTracker` in
-`sync_math.js`) keeps the head moving in real time, and ignores catch-up downloads after a pause.
-In all scenarios each user's reported live edge is within 0.4 s of the true one, and the run logs
-this error as `*_edge_err_ms`.
-
-The 83 ms limit is one frame plus 50 ms. A route with 200 ms out and 100 ms back shifts the clock
-estimate by (200 − 100) / 2 = 50 ms, and no client can see that (design doc, Timing model). On
-symmetric routes the result stays within one frame.
-
-## Real YouTube
-
-Full sync demos on real YouTube are **not** used as tests any more. In automated test windows,
-YouTube shows "Something went wrong" on its own, about 30 s into playback, in both windows at
-once, even with no extension loaded and no ads (check 1, see the Robustness table in docs/DESIGN.md).
-Real YouTube is only used for the live smoke checks:
-
-```powershell
-.\.venv\Scripts\python.exe tools\youtube_checks.py ads     "https://www.youtube.com/watch?v=<live id>"   # 2 windows, no extension, 5 min
-.\.venv\Scripts\python.exe tools\youtube_checks.py actions "https://www.youtube.com/watch?v=<live id>"   # 1 window, pause/rewind/skip/speed
-```
-
-`demo/two_window_demo.py` (two real-YouTube windows) is kept for manual runs. It no longer
-auto-reloads: reloading looped with YouTube's preroll ads.
-
-## Tools
-
-- `tools/delay_probe.py`: HLS `#EXT-X-PROGRAM-DATE-TIME` probe, used for cross-checks
-  (`--self-test`, or `<url> --duration 60`). Logs from the first validation are in `tools/logs/`.
-- `demo/debug_player.py`: opens one window and prints the YouTube player's state each second.
+MIT, see [LICENSE](LICENSE).

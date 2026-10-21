@@ -1,0 +1,59 @@
+/* Dark by default (OBS docks are dark); light when the system asks for it. */
+:root {
+  --bg: #16171b; --card: #202228; --line: #2e3138; --fg: #e9eaee; --muted: #9a9fab;
+  --accent: #5b8cff; --accent-fg: #fff; --ok: #3ccf7a; --warn: #f2b33d; --bad: #ff5d5d;
+  --chip: #2b2e36;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #f5f6f8; --card: #fff; --line: #e1e3e8; --fg: #16171b; --muted: #636978;
+          --accent: #2f6bff; --chip: #eef0f4; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+#app { max-width: 520px; margin: 0 auto; padding: 12px; }
+header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.brand { display: flex; align-items: center; gap: 8px; }
+#who { margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+label { display: block; margin-bottom: 10px; }
+input { display: block; width: 100%; margin-top: 4px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+        background: var(--bg); color: var(--fg); font: inherit; }
+button { font: inherit; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--chip);
+         color: var(--fg); cursor: pointer; }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+button.link { background: none; border: none; color: var(--muted); padding: 0 4px; text-decoration: underline; }
+.small-btn { padding: 4px 10px; font-size: 13px; }
+.row-between { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 8px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); display: inline-block; }
+.dot.on { background: var(--ok); }
+
+.me-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.big { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; }
+.sync-box { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.members { list-style: none; margin: 0 0 12px; padding: 0; }
+.member { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line);
+          border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+.member .name { font-weight: 600; }
+.member .sub { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.member .right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.chip { font-size: 11px; padding: 2px 7px; border-radius: 999px; background: var(--chip); color: var(--muted); white-space: nowrap; }
+.chip.ok { color: var(--ok); } .chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); }
+
+.offer { border-color: var(--accent); }
+.offer-title { font-weight: 650; margin-bottom: 4px; }
+.offer-move { font-size: 16px; margin-bottom: 4px; }
+.offer-actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.countdown { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.toasts { display: flex; flex-direction: column; gap: 6px; }
+.toast { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px;
+         padding: 8px 10px; font-size: 13px; }
+.toast.bad { border-left-color: var(--bad); } .toast.ok { border-left-color: var(--ok); } .toast.warn { border-left-color: var(--warn); }

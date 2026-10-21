@@ -1,3 +1,8 @@
+# Secrets: real values live in .env (see .env.example), never in git
+.env
+.env.*
+!.env.example
+
 # Environments and dependencies
 .venv/
 node_modules/
@@ -18,3 +23,8 @@ demo/*.csv
 demo/demo_summary.txt
 demo/ext_log_*.txt
 *.log
+
+# Recordings (the README demo GIF in docs/ is the only media committed, made from the fake page)
+*.webm
+*.mp4
+recordings/
