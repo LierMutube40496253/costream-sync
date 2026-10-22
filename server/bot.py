@@ -56,6 +56,13 @@ async def run(server_url: str, bot_token: str, secret: str) -> None:
                 queue.put_nowait(snapshot(ch))
 
     @client.event
+    async def on_guild_join(guild):
+        # Invited while running: people may already sit in its voice channels.
+        print(f"added to {guild.name}; watching {len(client.guilds)} server(s)", flush=True)
+        for ch in guild.voice_channels:
+            queue.put_nowait(snapshot(ch))
+
+    @client.event
     async def on_voice_state_update(member, before, after):
         for ch in changed_channels(before, after):
             queue.put_nowait(snapshot(ch))
