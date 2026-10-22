@@ -54,6 +54,7 @@ def server():
             time.sleep(0.2)
     yield
     proc.terminate()
+    proc.wait(10)   # on Linux uvicorn shuts down gracefully; the next test needs the port free
 
 
 @pytest.mark.e2e

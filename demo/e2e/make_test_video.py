@@ -39,7 +39,15 @@ def main(seconds=SECONDS):
     cmd = [imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-f", "lavfi", "-i", f"color=c=0x203040:s=640x360:r={FPS}:d={seconds}",
            *(["-vf", text] if text else []), "-c:v", "libvpx", "-b:v", "400k", "-g", str(FPS), "-keyint_min", str(FPS),
            "-deadline", "realtime", "-cpu-used", "8", "-an", str(OUT)]
-    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    run = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    if run.returncode and text:
+        # Some ffmpeg builds (imageio-ffmpeg's Linux one) have no drawtext: make it plain.
+        print(f"ffmpeg can't draw text ({run.stderr.strip().splitlines()[-1]}); making a plain video")
+        text = None
+        cmd.remove("-vf"); cmd.remove(counter_filter())
+        run = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    if run.returncode:
+        sys.exit(f"ffmpeg failed:\n{run.stderr[-2000:]}")
     print(f"wrote {OUT} ({OUT.stat().st_size / 1e6:.1f} MB, {seconds} s{'' if text else ', no font found: no drawn counter'})")
 
 

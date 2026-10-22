@@ -60,8 +60,9 @@ def servers():
     time.sleep(0.5)
     yield
     stop.set()
-    server.terminate()
-    discord.terminate()
+    for proc in (server, discord):   # wait: on Linux uvicorn shuts down gracefully, and the next
+        proc.terminate()             # test's server needs the port free
+        proc.wait(10)
 
 
 @pytest.mark.e2e
