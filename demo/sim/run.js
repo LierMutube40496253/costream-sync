@@ -18,9 +18,17 @@ const K = 1792504509.25;   // the stream's broadcast stamp (wall time = player t
 const trueNow = () => (performance.timeOrigin + performance.now()) / 1000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// The project's venv (Windows or Linux/macOS layout), else the Python on PATH (e.g. in CI).
+function python() {
+  if (process.env.COSTREAM_PYTHON) return process.env.COSTREAM_PYTHON;
+  for (const p of [path.join(ROOT, '.venv', 'Scripts', 'python.exe'), path.join(ROOT, '.venv', 'bin', 'python')]) {
+    if (fs.existsSync(p)) return p;
+  }
+  return process.platform === 'win32' ? 'python' : 'python3';
+}
+
 function startServer() {
-  const py = path.join(ROOT, '.venv', 'Scripts', 'python.exe');
-  const exe = fs.existsSync(py) ? py : 'python';
+  const exe = python();
   const proc = spawn(exe, ['-m', 'uvicorn', 'server.app:app', '--port', String(SERVER_PORT), '--log-level', 'warning'],
                      { cwd: ROOT, stdio: ['ignore', 'inherit', 'inherit'] });
   return proc;

@@ -88,6 +88,16 @@ async def root() -> RedirectResponse:
     return RedirectResponse("/panel/")
 
 
+@app.on_event("startup")
+async def say_mode() -> None:
+    # One line that tells which login mode is on (a missing .env silently meant dev mode).
+    if AUTH_MODE == "discord":
+        bot = "bot key set" if BOT_SHARED_SECRET else "NO BOT_SHARED_SECRET: the bot can't connect"
+        print(f"costream-sync: Discord login ON (application {DISCORD_CLIENT_ID}, {bot})", flush=True)
+    else:
+        print("costream-sync: dev mode (no DISCORD_CLIENT_ID in .env): name + room, no Discord login", flush=True)
+
+
 @dataclass
 class User:
     name: str                         # key: Discord user id (discord mode) or the typed name (dev mode)
@@ -443,6 +453,7 @@ async def identify(ws: WebSocket, hello: dict) -> tuple[User, Room | None] | Non
 async def run_bot(ws: WebSocket) -> None:
     """The Discord bot reports who is in which voice channel (voice_members)."""
     await ws.send_json({"type": "hello_ok", "role": "bot"})
+    print("costream-sync: Discord bot connected", flush=True)
     while True:
         msg = await ws.receive_json()
         if msg.get("type") != "voice_members":

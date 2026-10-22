@@ -3,6 +3,11 @@
 .env.*
 !.env.example
 
+# Editor folders
+.vs/
+.vscode/
+.idea/
+
 # Environments and dependencies
 .venv/
 node_modules/

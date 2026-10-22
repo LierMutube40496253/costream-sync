@@ -1,0 +1,88 @@
+name: tests
+
+# Every push and pull request. No secrets: the server runs in dev mode and the Discord tests use
+# the fake Discord in tests/e2e/fake_discord.py.
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: pytest (quick) + Vitest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: pip install -r requirements.txt
+      - run: npm ci
+      - name: pytest (rules, protocol, Discord login, bot)
+        run: python -m pytest -q -m "not e2e"
+      - name: Vitest (extension logic)
+        run: npx vitest run
+
+  e2e:
+    name: pytest e2e (headless Chromium + extension)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m playwright install --with-deps chromium
+      - name: Test video (generated once, then cached)
+        uses: actions/cache@v4
+        with:
+          path: demo/e2e/test_video.webm
+          key: test-video-${{ hashFiles('demo/e2e/make_test_video.py') }}
+      - name: pytest e2e (two-window sync, panel, Discord login)
+        run: python -m pytest -q -m e2e
+      - name: Keep logs if it failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-output
+          path: demo/e2e/out/
+
+  simulator:
+    name: simulator ${{ matrix.scenario }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [nearby, doc_example, youtube_head, reload_and_errors, copenhagen_sydney]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -r requirements.txt
+      - name: Run the scenario against the real server
+        run: node demo/sim/run.js demo/sim/scenarios/${{ matrix.scenario }}.json
+      - name: Keep logs if it failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sim-${{ matrix.scenario }}
+          path: demo/sim/out/

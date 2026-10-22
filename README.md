@@ -1,5 +1,7 @@
 # costream-sync
 
+[![tests](https://github.com/LierMutube40496253/costream-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/LierMutube40496253/costream-sync/actions/workflows/ci.yml)
+
 Co-streamers who watch the same YouTube live broadcast each see it with a different delay, so
 they react to different moments. costream-sync lines their players up **to within about one video
 frame**. Streamers keep watching on youtube.com as normal. A Chrome extension shifts the page's
@@ -127,6 +129,11 @@ npm run sim:all                                        # 5 simulator scenarios, 
 .\.venv\Scripts\python.exe demo\e2e\record_demo.py     # re-record docs/demo.gif
 ```
 
+GitHub Actions runs all of this on every push and pull request
+([.github/workflows/ci.yml](.github/workflows/ci.yml)): quick pytest + Vitest, the browser
+tests in headless Chromium, and the 5 simulator scenarios in parallel. CI needs no secrets: the
+server runs in dev mode, and the Discord tests use a fake Discord.
+
 `pytest` includes the browser tests (marked `e2e`):
 - the two-window end-to-end test above
 - the panel test: A clicks Match in A's panel, B's panel shows "Accepting will skip your stream
@@ -155,7 +162,7 @@ The Discord tests also check the security rules:
 - **Across continents, precision is set by the network**, as described under Measured results.
 - **Discord login and bot:** built and tested against a fake Discord, but not yet with a real
   Discord application.
-- **Not built yet:** CI. Twitch is out of scope, because its player can't rewind live.
+- **Out of scope:** Twitch, because its player can't rewind live.
 
 ## Project layout
 
